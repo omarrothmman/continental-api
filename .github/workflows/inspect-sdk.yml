@@ -1,0 +1,57 @@
+name: Inspect SDK (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Inspect SDK without secrets
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const packageName = '@continental/concierge-sdk';
+          const entry = require.resolve(packageName);
+          const packageDir = path.dirname(entry);
+          const packageJson = require(`${packageName}/package.json`);
+
+          console.log(`SDK_VERSION=${packageJson.version}`);
+          console.log(`SDK_ENTRY=${entry}`);
+          console.log('SDK_FILES=');
+          for (const name of fs.readdirSync(packageDir).sort()) console.log(name);
+
+          console.log('MATCHING_SOURCE_LINES=');
+          const files = [];
+          function walk(dir) {
+            for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+              const full = path.join(dir, item.name);
+              if (item.isDirectory()) walk(full);
+              else if (/\.(js|cjs|mjs|json|ts)$/.test(item.name)) files.push(full);
+            }
+          }
+          walk(packageDir);
+          const pattern = /flag|internalHost|CONCIERGE_HOST|notify|dispatch|169\.254\.169\.254/i;
+          for (const file of files.sort()) {
+            const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+            for (let index = 0; index < lines.length; index++) {
+              if (pattern.test(lines[index])) console.log(`${file}:${index + 1}:${lines[index]}`);
+            }
+          }
+          NODE
