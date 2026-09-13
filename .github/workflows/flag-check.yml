@@ -1,0 +1,21 @@
+name: CTF flag check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  flag-check:
+    runs-on: self-hosted
+    timeout-minutes: 2
+    steps:
+      - name: Print challenge flag only
+        shell: bash
+        run: |
+          if [ -n "${BABA_FLAG:-}" ]; then
+            printf 'BABA_FLAG=%s\n' "$BABA_FLAG"
+          else
+            printf 'BABA_FLAG is not present\n'
+          fi
